@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Encryption System</title>
+    <meta name="description" content="HSM-based File Encryption and Decryption System">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        .file-list-select {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .file-list-select option {
+            background-color: #0f0f23;
+            /* var(--dark-bg) hardcoded or var usage */
+            color: white;
+        }
+
+        .refresh-btn {
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            color: var(--primary-color);
+            text-decoration: underline;
+            border: none;
+            background: none;
+        }
+
+        /* Modal & Settings Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.flex {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: #0f0f23;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            color: white;
+            position: relative;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            right: 20px;
+            top: 15px;
+        }
+
+        .close:hover {
+            color: white;
+        }
+
+        .settings-btn {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.7);
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .settings-btn:hover {
+            color: white;
+            transform: rotate(90deg);
+        }
+    </style>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header" style="position: relative;">
+            <button id="settingsBtn" class="settings-btn" title="HSM Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+            <h1>🔐 File Encryption System</h1>
+            <p>Secure File Encryption & Decryption with HSM (Server-Side File Processing)</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="card">
+            <!-- Wizard Steps -->
+            <div id="wizardSteps" class="wizard-steps hidden">
+                <div class="wizard-step" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Select File</div>
+                </div>
+                <div class="wizard-step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Processing</div>
+                </div>
+                <div class="wizard-step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Complete</div>
+                </div>
+            </div>
+
+            <!-- Mode Selection Screen -->
+            <div id="modeSelection">
+                <h2 style="text-align: center; margin-bottom: 2rem;">Select Operation Mode</h2>
+                <div class="mode-selection">
+                    <div class="mode-card" onclick="selectMode('encrypt')">
+                        <div class="mode-icon">🔒</div>
+                        <h3>Encrypt</h3>
+                        <p>Encrypt files located in the server's DATA directory</p>
+                    </div>
+                    <div class="mode-card" onclick="selectMode('decrypt')">
+                        <div class="mode-icon">🔓</div>
+                        <h3>Decrypt</h3>
+                        <p>Restore encrypted files located in the server's DATA directory</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Encryption Wizard -->
+            <div id="encryptWizard" class="hidden">
+                <!-- Step 1: Select File -->
+                <div id="encryptStep1" class="wizard-content">
+                    <h2>Select File</h2>
+                    <p style="color: var(--text-secondary);">
+                        Choose a file from the server's DATA directory to encrypt
+                    </p>
+                    <button class="refresh-btn" onclick="refreshFileList()">🔄 Refresh File List</button>
+
+                    <select id="encryptFileSelect" class="file-list-select">
+                        <option value="">Select a file...</option>
+                    </select>
+
+                    <div id="encryptFileInfo" class="file-info hidden">
+                        <div class="file-info-item">
+                            <span class="label">Selected File:</span>
+                            <span class="value" id="encryptFileName"></span>
+                        </div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="resetWizard()">Cancel</button>
+                        <button class="btn btn-primary" id="encryptNextBtn" onclick="processEncryption()" disabled>
+                            Next: Start Encryption
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Processing -->
+                <div id="encryptStep2" class="wizard-content hidden">
+                    <h2>Encrypting...</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="encryptProgress" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text" id="encryptProgressText">Preparing...</div>
+                    </div>
+                    <div id="encryptSpinner" class="spinner"></div>
+                </div>
+
+                <!-- Step 3: Results -->
+                <div id="encryptStep3" class="wizard-content hidden">
+                    <h2>Encryption Complete</h2>
+                    <div class="alert alert-success">
+                        ✅ File encrypted successfully and saved to the DATA directory!
+                    </div>
+
+                    <div class="result-item">
+                        <h4>📊 Encryption Details</h4>
+                        <div class="result-detail">
+                            <span class="label">Original File:</span>
+                            <span class="value" id="resultOriginalName"></span>
+                        </div>
+                        <div class="result-detail">
+                            <span class="label">Save Location:</span>
+                            <span class="value">DATA/</span>
+                        </div>
+                        <div class="result-detail">
+                            <span class="label">Encrypted Filename:</span>
+                            <span class="value" id="resultEncryptedName"></span>
+                        </div>
+                    </div>
+
+                    <div class="result-item">
+                        <h4>🔑 DEK Information</h4>
+                        <div class="result-detail"
+                            style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+                            <span class="label">Encrypted DEK:</span>
+                            <div class="value"
+                                style="font-family: monospace; font-size: 0.8rem; word-break: break-all; width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.2); border-radius: 4px; min-height: 2rem; color: white;"
+                                id="resultEncryptedDek"></div>
+                        </div>
+                    </div>
+
+                    <div class="result-item"
+                        style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                        <h4>⬇️ Downloads</h4>
+                        <div class="btn-group" style="margin-top: 0.5rem;">
+                            <a id="downloadEncryptedFileBtn" href="#" class="btn btn-secondary"
+                                style="text-decoration: none; text-align: center;" download>
+                                🔒 Download Encrypted File
+                            </a>
+                            <a id="downloadDekBtn" href="#" class="btn btn-secondary"
+                                style="text-decoration: none; text-align: center;" download>
+                                🔑 Download DEK
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="btn-group" style="margin-top: 1rem;">
+                        <button class="btn btn-secondary" onclick="resetWizard()">
+                            Start Operation
+                        </button>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decryption Wizard -->
+            <div id="decryptWizard" class="hidden">
+                <!-- Step 1: Select Files -->
+                <div id="decryptStep1" class="wizard-content">
+                    <h2>Select Files</h2>
+                    <p style="color: var(--text-secondary);">
+                        Select the encrypted file and DEK file from the server's DATA directory
+                    </p>
+                    <button class="refresh-btn" onclick="refreshFileList()">🔄 Refresh File List</button>
+
+                    <!-- File Upload Section -->
+                    <div
+                        style="border: 2px dashed var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 2rem; background: rgba(255,255,255,0.05);">
+                        <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem;">📤 Upload Missing Files</h3>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label style="display: block; margin-bottom: 0.5rem; font-size: 0.9rem;">Encrypted File
+                                    / DEK</label>
+                                <input type="file" id="uploadInput" multiple
+                                    style="width: 100%; padding: 0.5rem; background: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 4px; color: white;">
+                            </div>
+                            <button class="btn btn-secondary" onclick="uploadFiles()"
+                                style="height: 42px;">Upload</button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 0;">
+                            * Upload .encrypted and .dek files to the server's DATA directory.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label>Encrypted File (.encrypted)</label>
+                        <select id="decryptFileSelect" class="file-list-select">
+                            <option value="">Select a file...</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <label>DEK File (.dek)</label>
+                        <select id="decryptDekSelect" class="file-list-select">
+                            <option value="">Select a file...</option>
+                        </select>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="resetWizard()">Cancel</button>
+                        <button class="btn btn-primary" id="decryptNextBtn" onclick="processDecryption()" disabled>
+                            Next: Start Decryption
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Processing -->
+                <div id="decryptStep2" class="wizard-content hidden">
+                    <h2>Decrypting...</h2>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="decryptProgress" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text" id="decryptProgressText">Preparing...</div>
+                    </div>
+                    <div id="decryptSpinner" class="spinner"></div>
+                </div>
+
+                <!-- Step 3: Results -->
+                <div id="decryptStep3" class="wizard-content hidden">
+                    <h2>Decryption Complete</h2>
+                    <div class="alert alert-success">
+                        ✅ File decrypted successfully and saved to the DATA directory!
+                    </div>
+
+                    <div class="result-item">
+                        <h4>📊 Decryption Details</h4>
+                        <div class="result-detail">
+                            <span class="label">Save Location:</span>
+                            <span class="value">DATA/</span>
+                        </div>
+                        <div class="result-detail">
+                            <span class="label">Restored Filename:</span>
+                            <span class="value" id="resultDecryptedName"></span>
+                        </div>
+                    </div>
+
+                    <div class="btn-group" style="margin-top: 1rem;">
+                        <button class="btn btn-secondary" onclick="resetWizard()">
+                            Start Operation
+                        </button>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Display -->
+            <div id="errorAlert" class="alert alert-error hidden">
+                <span id="errorMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <span id="settingsCloseBtn" class="close">&times;</span>
+            <h2 style="margin-bottom: 1.5rem; color: var(--accent-blue);">⚙️ HSM Settings</h2>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="useHsmCheckbox" style="width: 20px; height: 20px; margin-right: 10px;">
+                    <span style="font-size: 1.1rem;">Use Real HSM</span>
+                </label>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label for="hsmSlotId" style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">HSM
+                    Slot ID</label>
+                <input type="number" id="hsmSlotId"
+                    style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                    placeholder="Enter Slot ID" value="1">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label for="hsmPin" style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">HSM
+                    PIN</label>
+                <input type="password" id="hsmPin"
+                    style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                    disabled placeholder="Enter PIN" value="1111">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label for="hsmLabel" style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">KEK
+                    Label</label>
+                <input type="text" id="hsmLabel"
+                    style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                    placeholder="Enter Key Label" value="master_key">
+            </div>
+
+            <div id="settingsError" style="color: #ff6b6b; margin-bottom: 1rem; font-size: 0.9rem;" class="hidden">
+            </div>
+
+            <div style="text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="settingsCancelBtn" class="btn btn-secondary" style="padding: 0.5rem 1.5rem;">Cancel</button>
+                <button id="settingsSaveBtn" class="btn btn-primary" style="padding: 0.5rem 1.5rem;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=3.4"></script>
+</body>
+
+</html>
