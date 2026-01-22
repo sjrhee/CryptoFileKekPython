@@ -67,6 +67,59 @@ graph TD
     FES -->|AES-GCM| FS
 ```
 
+### 2. 데이터 흐름: 암호화 (Data Flow: Encryption)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Flask App
+    participant S as Service Layer
+    participant H as HSM
+    participant F as File System
+
+    U->>C: 1. 파일 선택 (서버 내 파일)
+    C->>F: 파일 존재 확인
+    
+    U->>C: 2. 암호화 요청
+    C->>S: 프로세스 시작
+    
+    S->>S: 3. 랜덤 DEK 생성 (AES-256)
+    S->>F: 원본 파일 읽기
+    S->>S: 4. 파일 암호화 (AES-GCM w/ DEK)
+    S->>F: 암호화된 파일 저장 (.encrypted)
+    
+    S->>H: 5. DEK 암호화 요청 (Key Wrap)
+    H-->>S: 암호화된 DEK 반환 (Wrapped Key)
+    S->>F: 암호화된 DEK 저장 (.dek)
+    
+    C-->>U: 6. 완료 및 암호화 파일/키 다운로드 링크 제공
+```
+
+### 3. 데이터 흐름: 복호화 (Data Flow: Decryption)
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Flask App
+    participant S as Service Layer
+    participant H as HSM
+    participant F as File System
+
+    U->>C: 1. 암호화된 파일 & DEK 업로드
+    C->>F: 파일 저장
+    
+    U->>C: 2. 복호화 요청
+    C->>S: 프로세스 시작
+    
+    S->>F: 암호화된 DEK 읽기
+    S->>H: 3. DEK 복호화 요청 (Key Unwrap)
+    H-->>S: 평문 DEK 반환
+    
+    S->>F: 암호화된 파일 읽기
+    S->>S: 4. 파일 복호화 (AES-GCM w/ DEK)
+    S->>F: 복호화된 원본 파일 저장 (서버)
+    
+    C-->>U: 5. 완료 알림 (서버 저장됨, 다운로드 불가)
+```
+
 ## 설치 및 실행 방법 (How to Run)
 
 ### 1. 필수 요구사항 (Prerequisites)
