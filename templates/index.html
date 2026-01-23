@@ -22,9 +22,15 @@
             color: var(--text-primary);
         }
 
-        .file-list-select option {
+        .file-list-select option,
+        .dark-option {
             background-color: #0f0f23;
-            /* var(--dark-bg) hardcoded or var usage */
+            color: white;
+        }
+
+        /* Force option styling for specific selects if needed */
+        select option {
+            background-color: #0f0f23;
             color: white;
         }
 
@@ -358,10 +364,14 @@
             <h2 style="margin-bottom: 1.5rem; color: var(--accent-blue);">⚙️ HSM Settings</h2>
 
             <div style="margin-bottom: 1.5rem;">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input type="checkbox" id="useHsmCheckbox" style="width: 20px; height: 20px; margin-right: 10px;">
-                    <span style="font-size: 1.1rem;">Use Real HSM</span>
-                </label>
+                <label for="hsmTypeSelect"
+                    style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">HSM Type</label>
+                <select id="hsmTypeSelect"
+                    style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;">
+                    <option value="SIMULATED" style="background-color: #0f0f23; color: white;">Simulated HSM</option>
+                    <option value="PSE" style="background-color: #0f0f23; color: white;">PSE HSM</option>
+                    <option value="LUNA" style="background-color: #0f0f23; color: white;">Luna HSM</option>
+                </select>
             </div>
 
             <div style="margin-bottom: 1.5rem;">

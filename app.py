@@ -6,10 +6,16 @@ from src.services.hsm_service import HsmService, SimulatedHsmService, RealHsmSer
 from src.services.dek_service import DekService
 from src.services.file_encryption_service import FileEncryptionService
 
+import logging
+
 # Initialize App
 app = Flask(__name__)
 app.config['DATA_DIR'] = os.path.join(os.getcwd(), 'DATA')
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB Limit
+
+# Configure Logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Ensure DATA directory exists
 if not os.path.exists(app.config['DATA_DIR']):
@@ -18,6 +24,7 @@ if not os.path.exists(app.config['DATA_DIR']):
 # Initialize Services
 # By default start with Simulated HSM. Real HSM can be enabled via settings.
 hsm_service = SimulatedHsmService()
+current_hsm_type = 'SIMULATED'
 dek_service = DekService(hsm_service)
 file_storage_service = FileStorageService(app.config['DATA_DIR'])
 file_encryption_service = FileEncryptionService()
@@ -25,6 +32,18 @@ file_encryption_service = FileEncryptionService()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'success': False, 'message': f"Internal Server Error: {str(error)}"}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # pass through HTTP errors
+    if hasattr(e, 'code'):
+        return jsonify({'success': False, 'message': str(e)}), e.code
+    # now you're handling non-HTTP exceptions only
+    return jsonify({'success': False, 'message': f"Unexpected Error: {str(e)}"}), 500
 
 # API Routes
 
@@ -67,27 +86,50 @@ def list_files():
 
 @app.route('/api/hsm/status', methods=['GET'])
 def hsm_status():
-    use_hsm = isinstance(hsm_service, RealHsmService)
-    return jsonify({'useHsm': use_hsm})
+    hsm_type = 'SIMULATED'
+    if isinstance(hsm_service, RealHsmService):
+        # We need to distinguish between PSE and LUNA based on lib_path or a stored flag.
+        # simpler way: store a global hsm_type_str
+        pass 
+    
+    # Actually, let's just use a global variable or attribute since we are stateless-ish here
+    # accessing the global hsm_type variable defined effectively by config
+    return jsonify({'hsmType': current_hsm_type})
 
 @app.route('/api/hsm/config', methods=['POST'])
 def hsm_config():
-    global hsm_service, dek_service
+    global hsm_service, dek_service, current_hsm_type
     data = request.json
-    use_hsm = data.get('useHsm', False)
+    
+    # New parameter hsmType: 'SIMULATED' | 'PSE' | 'LUNA'
+    # Fallback to useHsm for backward compatibility if needed, but we are changing frontend too.
+    hsm_type = data.get('hsmType', 'SIMULATED')
+    
     pin = data.get('pin', '')
     label = data.get('label', 'mk') # Default to 'mk' if not provided
     slot_id = data.get('slotId', 0)
 
     try:
-        if use_hsm:
-            # Switch to Real HSM
-            new_hsm = RealHsmService(label=label, slot_id=slot_id)
-            new_hsm.login(pin) # Try login
+        if hsm_type == 'LUNA':
+            # Luna Specifics
+            lib_path = '/opt/safenet/lunaclient/lib/libCryptoki2_64.so'
+            # Note: User provided slot and pin are used, but frontend will default them.
+            new_hsm = RealHsmService(lib_path=lib_path, label=label, slot_id=slot_id)
+            new_hsm.login(pin)
             hsm_service = new_hsm
+            current_hsm_type = 'LUNA'
+            
+        elif hsm_type == 'PSE':
+            # PSE (formerly Real HSM) - Auto-detect lib
+            new_hsm = RealHsmService(label=label, slot_id=slot_id)
+            new_hsm.login(pin)
+            hsm_service = new_hsm
+            current_hsm_type = 'PSE'
+            
         else:
-            # Switch to Simulated HSM
+            # SIMULATED
             hsm_service = SimulatedHsmService()
+            current_hsm_type = 'SIMULATED'
         
         # Re-inject dependency
         dek_service = DekService(hsm_service)

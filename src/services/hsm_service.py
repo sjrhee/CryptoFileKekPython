@@ -149,60 +149,31 @@ class RealHsmService(HsmService):
         return keys[0]
 
     def encrypt_with_kek(self, plaintext: bytes) -> bytes:
-        # Wrap Data (Treat plaintext as a key to be wrapped for C_WrapKey behavior simulation)
-        # Note: True WrapKey wraps a handle. 
-        # Since we have bytes, we can use C_Encrypt if the KEK allows it, OR
-        # better for 'Key Wrapping' semantics, acts as if we are protecting a key.
-        # However, Java code used wrapping. 
-        # Standard AES Wrap mechanism: CKM_AES_KEY_WRAP
+        # Determine mechanism
+        # CKM_AES_KEY_WRAP (RFC 3394) is standard for wrapping keys.
+        # We use C_Encrypt which takes raw bytes and returns raw bytes (wrapped key).
+        # This avoids C_WrapKey/C_UnwrapKey which require creating/managing Object Handles and Templates,
+        # often leading to CKR_TEMPLATE_INCONSISTENT if attributes don't perfectly match HSM policies.
         
         kek_handle = self._find_key()
-        
-        # Mechanism: CKM_AES_KEY_WRAP (AES Key Wrap) receives raw data in some implementations
-        # OR requires a handle. 
-        # If we just want to encrypt data with the KEK:
         mechanism = PyKCS11.Mechanism(PyKCS11.CKM_AES_KEY_WRAP)
         
-        # PyKCS11 might require the plaintext to be a key handle for wrapKey.
-        # But 'Simulated' effectively just encrypted bytes.
-        # If the input IS a key (DEK), we should create a session key object first.
-        
-        # 1. Create temporary object for DEK
-        dek_template = [
-            (PyKCS11.CKA_CLASS, PyKCS11.CKO_SECRET_KEY),
-            (PyKCS11.CKA_KEY_TYPE, PyKCS11.CKK_AES),
-            (PyKCS11.CKA_VALUE, plaintext),
-            (PyKCS11.CKA_SENSITIVE, False),
-            (PyKCS11.CKA_EXTRACTABLE, True)
-        ]
-        dek_handle = self.session.createObject(dek_template)
-        
         try:
-            # 2. Wrap it
-            # Note: PyKCS11 wrapKey returns a tuple/list of bytes
-            wrapped_key = self.session.wrapKey(kek_handle, dek_handle, mechanism)
-            return bytes(wrapped_key)
-        finally:
-             self.session.destroyObject(dek_handle)
+            # encrypt returns tuple/list of bytes
+            wrapped_data = self.session.encrypt(kek_handle, plaintext, mechanism)
+            return bytes(wrapped_data)
+        except Exception as e:
+            logger.error(f"HSM Encrypt (Wrap) failed: {e}")
+            raise
 
     def decrypt_with_kek(self, ciphertext: bytes) -> bytes:
         kek_handle = self._find_key()
         mechanism = PyKCS11.Mechanism(PyKCS11.CKM_AES_KEY_WRAP)
         
-        # Template for the unwrapped key
-        dek_template = [
-            (PyKCS11.CKA_CLASS, PyKCS11.CKO_SECRET_KEY),
-            (PyKCS11.CKA_KEY_TYPE, PyKCS11.CKK_AES),
-            (PyKCS11.CKA_SENSITIVE, False),
-            (PyKCS11.CKA_EXTRACTABLE, True)
-        ]
-        
-        # Unwrap returns a handle
-        dek_handle = self.session.unwrapKey(kek_handle, list(ciphertext), dek_template, mechanism)
-        
         try:
-            # Get Value
-            value = self.session.getAttributeValue(dek_handle, [PyKCS11.CKA_VALUE])[0]
-            return bytes(value)
-        finally:
-            self.session.destroyObject(dek_handle)
+            # decrypt returns tuple/list of bytes
+            decrypted_data = self.session.decrypt(kek_handle, list(ciphertext), mechanism)
+            return bytes(decrypted_data)
+        except Exception as e:
+            logger.error(f"HSM Decrypt (Unwrap) failed: {e}")
+            raise

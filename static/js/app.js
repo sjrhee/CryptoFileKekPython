@@ -193,7 +193,7 @@ const Settings = {
         const closeBtn = document.getElementById("settingsCloseBtn");
         const cancelBtn = document.getElementById("settingsCancelBtn");
         const saveBtn = document.getElementById("settingsSaveBtn");
-        const checkbox = document.getElementById("useHsmCheckbox");
+        const select = document.getElementById("hsmTypeSelect");
 
         if (btn && modal) {
             btn.addEventListener('click', (e) => {
@@ -207,7 +207,7 @@ const Settings = {
             if (closeBtn) closeBtn.addEventListener('click', () => this.close());
             if (cancelBtn) cancelBtn.addEventListener('click', () => this.close());
             if (saveBtn) saveBtn.addEventListener('click', () => this.save());
-            if (checkbox) checkbox.addEventListener('change', () => this.togglePinInput());
+            if (select) select.addEventListener('change', () => this.handleHsmChange());
 
             // Close on outside click
             window.addEventListener('click', (event) => {
@@ -232,24 +232,32 @@ const Settings = {
         if (errorDiv) errorDiv.classList.add('hidden');
     },
 
-    togglePinInput() {
-        console.log("Settings: Toggling PIN input");
-        const checkbox = document.getElementById("useHsmCheckbox");
+    handleHsmChange() {
+        console.log("Settings: Handling HSM change");
+        const select = document.getElementById("hsmTypeSelect");
         const slotInput = document.getElementById("hsmSlotId");
         const labelInput = document.getElementById("hsmLabel");
         const pinInput = document.getElementById("hsmPin");
-        if (checkbox && pinInput) {
-            const useHsm = checkbox.checked;
-            pinInput.disabled = !useHsm;
-            if (labelInput) labelInput.disabled = !useHsm;
-            if (slotInput) slotInput.disabled = !useHsm;
+        const errorDiv = document.getElementById("settingsError");
 
-            console.log("Settings: Use HSM =", useHsm);
-            if (!useHsm) {
-                // pinInput.value = ''; // Keep default value for demo convenience
-                const errorDiv = document.getElementById("settingsError");
-                if (errorDiv) errorDiv.classList.add('hidden');
-            }
+        if (!select) return;
+
+        const type = select.value;
+        console.log("Settings: Selected Type =", type);
+
+        const isSimulated = (type === 'SIMULATED');
+
+        if (pinInput) pinInput.disabled = isSimulated;
+        if (labelInput) labelInput.disabled = isSimulated;
+        if (slotInput) slotInput.disabled = isSimulated;
+
+        if (isSimulated) {
+            if (errorDiv) errorDiv.classList.add('hidden');
+        } else if (type === 'LUNA') {
+            // Auto-fill Luna defaults
+            if (pinInput) pinInput.value = '12341234';
+            if (labelInput) labelInput.value = 'master_key';
+            if (slotInput) slotInput.value = '1';
         }
     },
 
@@ -260,10 +268,15 @@ const Settings = {
             if (response.ok) {
                 const status = await response.json();
                 console.log("Settings: Received status", status);
-                const checkbox = document.getElementById("useHsmCheckbox");
-                if (checkbox) {
-                    checkbox.checked = status.useHsm;
-                    this.togglePinInput();
+                const select = document.getElementById("hsmTypeSelect");
+                if (select) {
+                    // Handle both new 'hsmType' and legacy 'useHsm' just in case
+                    if (status.hsmType) {
+                        select.value = status.hsmType;
+                    } else {
+                        select.value = status.useHsm ? 'PSE' : 'SIMULATED';
+                    }
+                    this.handleHsmChange();
                 }
             } else {
                 console.error("Settings: Failed to load status", response.status);
@@ -275,26 +288,26 @@ const Settings = {
 
     async save() {
         console.log("Settings: Saving configuration...");
-        const checkbox = document.getElementById("useHsmCheckbox");
+        const select = document.getElementById("hsmTypeSelect");
         const slotInput = document.getElementById("hsmSlotId");
         const labelInput = document.getElementById("hsmLabel");
         const pinInput = document.getElementById("hsmPin");
         const errorDiv = document.getElementById("settingsError");
 
-        if (!checkbox || !pinInput || !errorDiv) {
-            console.error("Settings: Save failed due to missing elements", { checkbox, pinInput, errorDiv });
+        if (!select || !pinInput || !errorDiv) {
+            console.error("Settings: Save failed due to missing elements");
             return;
         }
 
-        const useHsm = checkbox.checked;
+        const hsmType = select.value;
         const pin = pinInput.value;
         const label = labelInput ? labelInput.value : 'master_key';
         const slotId = (slotInput && slotInput.value) ? parseInt(slotInput.value) : 1;
 
-        console.log("Settings: Saving", { useHsm, pinHasValue: !!pin, label, slotId });
+        console.log("Settings: Saving", { hsmType, pinHasValue: !!pin, label, slotId });
 
         // Validation
-        if (useHsm && (!pin || pin.trim() === '')) {
+        if (hsmType !== 'SIMULATED' && (!pin || pin.trim() === '')) {
             errorDiv.textContent = "PIN is required when using HSM.";
             errorDiv.classList.remove('hidden');
             console.warn("Settings: Save aborted - PIN required");
@@ -306,7 +319,7 @@ const Settings = {
             const response = await fetch('/api/hsm/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ useHsm: useHsm, pin: pin, label: label, slotId: slotId })
+                body: JSON.stringify({ hsmType: hsmType, pin: pin, label: label, slotId: slotId })
             });
 
             if (response.ok) {
