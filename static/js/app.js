@@ -186,7 +186,15 @@ const UI = {
 // 3.5 SETTINGS MODULE
 // ==========================================
 const Settings = {
-    init() {
+    config: {
+        luna: { pin: '', slotId: 1, label: 'master_key' },
+        pse: { pin: '', slotId: 1, label: 'master_key' }
+    },
+
+
+    async init() {
+        await this.loadDefaults();
+
         console.log("Settings: Initializing...");
         const btn = document.getElementById("settingsBtn");
         const modal = document.getElementById("settingsModal");
@@ -218,6 +226,19 @@ const Settings = {
             });
         } else {
             console.error("Settings: Required elements not found!", { btn, modal });
+        }
+    },
+
+    async loadDefaults() {
+        try {
+            const response = await fetch('/api/config/defaults');
+            if (response.ok) {
+                const defaults = await response.json();
+                this.config = defaults;
+                console.log("Settings: Loaded defaults", this.config);
+            }
+        } catch (e) {
+            console.warn("Settings: Failed to load defaults", e);
         }
     },
 
@@ -254,11 +275,18 @@ const Settings = {
         if (isSimulated) {
             if (errorDiv) errorDiv.classList.add('hidden');
         } else if (type === 'LUNA') {
-            // Auto-fill Luna defaults
-            if (pinInput) pinInput.value = '12341234';
-            if (labelInput) labelInput.value = 'master_key';
-            if (slotInput) slotInput.value = '1';
+            // Auto-fill Luna defaults from config
+            if (pinInput) pinInput.value = this.config.luna.pin;
+            if (labelInput) labelInput.value = this.config.luna.label;
+            if (slotInput) slotInput.value = this.config.luna.slotId;
+        } else if (type === 'PSE') {
+            // Auto-fill PSE defaults from config
+            if (pinInput) pinInput.value = this.config.pse.pin;
+            if (labelInput) labelInput.value = this.config.pse.label;
+            if (slotInput) slotInput.value = this.config.pse.slotId;
         }
+
+
     },
 
     async loadStatus() {

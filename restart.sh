@@ -1,5 +1,5 @@
 #!/bin/bash
+echo "Restarting application..."
 ./stop.sh
-echo "Waiting for port to release..."
 sleep 2
 ./start.sh

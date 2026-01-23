@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import base64
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from src.services.file_storage_service import FileStorageService
@@ -46,6 +50,23 @@ def handle_exception(e):
     return jsonify({'success': False, 'message': f"Unexpected Error: {str(e)}"}), 500
 
 # API Routes
+
+@app.route('/api/config/defaults', methods=['GET'])
+def get_config_defaults():
+    return jsonify({
+        'luna': {
+            'pin': os.getenv('LUNA_HSM_PIN', '12341234'),
+            'slotId': os.getenv('LUNA_HSM_SLOT', '1'),
+            'label': os.getenv('LUNA_HSM_LABEL', 'master_key')
+        },
+        'pse': {
+            'pin': os.getenv('PSE_HSM_PIN', '1111'),
+            'slotId': os.getenv('PSE_HSM_SLOT', '1'),
+            'label': os.getenv('PSE_HSM_LABEL', 'master_key')
+        }
+    })
+
+
 
 @app.route('/api/files/upload', methods=['POST'])
 def upload_file():
@@ -105,14 +126,32 @@ def hsm_config():
     # Fallback to useHsm for backward compatibility if needed, but we are changing frontend too.
     hsm_type = data.get('hsmType', 'SIMULATED')
     
-    pin = data.get('pin', '')
-    label = data.get('label', 'mk') # Default to 'mk' if not provided
-    slot_id = data.get('slotId', 0)
+    
+    # Defaults depend on type
+    default_pin = ''
+    default_label = 'mk'
+    default_slot = 0
+    
+    if hsm_type == 'LUNA':
+        default_pin = os.getenv('LUNA_HSM_PIN', '')
+        default_label = os.getenv('LUNA_HSM_LABEL', 'master_key')
+        default_slot = int(os.getenv('LUNA_HSM_SLOT', '1'))
+    elif hsm_type == 'PSE':
+        default_pin = os.getenv('PSE_HSM_PIN', '')
+        default_label = os.getenv('PSE_HSM_LABEL', 'master_key')
+        default_slot = int(os.getenv('PSE_HSM_SLOT', '1'))
+
+    pin = data.get('pin', default_pin)
+    label = data.get('label', default_label)
+    slot_id = data.get('slotId', default_slot)
+
 
     try:
         if hsm_type == 'LUNA':
+
             # Luna Specifics
-            lib_path = '/opt/safenet/lunaclient/lib/libCryptoki2_64.so'
+            lib_path = os.getenv('LUNA_LIB_PATH', '/opt/safenet/lunaclient/lib/libCryptoki2_64.so')
+
             # Note: User provided slot and pin are used, but frontend will default them.
             new_hsm = RealHsmService(lib_path=lib_path, label=label, slot_id=slot_id)
             new_hsm.login(pin)
@@ -122,7 +161,8 @@ def hsm_config():
         elif hsm_type == 'PSE':
             # PSE HSM
             # User specified path:
-            pse_lib_path = '/opt/safenet/protecttoolkit7/ptk/lib/libcryptoki.so'
+            pse_lib_path = os.getenv('PSE_LIB_PATH', '/opt/safenet/protecttoolkit7/ptk/lib/libcryptoki.so')
+
             
             new_hsm = RealHsmService(lib_path=pse_lib_path, label=label, slot_id=slot_id)
             new_hsm.login(pin)

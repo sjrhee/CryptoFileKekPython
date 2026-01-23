@@ -9,3 +9,8 @@ DATA/*
 .vscode/
 *.key
 
+# Local config and logs
+.env
+*.log
+*.pid
+nohup.out
