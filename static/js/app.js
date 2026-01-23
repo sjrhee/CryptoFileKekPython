@@ -186,10 +186,13 @@ const UI = {
 // 3.5 SETTINGS MODULE
 // ==========================================
 const Settings = {
+
     config: {
         luna: { pin: '', slotId: 1, label: 'master_key' },
-        pse: { pin: '', slotId: 1, label: 'master_key' }
+        pse: { pin: '', slotId: 1, label: 'master_key' },
+        aws: { accessKey: '', secretKey: '', region: 'ap-northeast-2', keyId: '' }
     },
+
 
 
     async init() {
@@ -267,10 +270,25 @@ const Settings = {
         console.log("Settings: Selected Type =", type);
 
         const isSimulated = (type === 'SIMULATED');
+        const isAws = (type === 'AWS');
 
-        if (pinInput) pinInput.disabled = isSimulated;
+        if (pinInput) pinInput.disabled = isSimulated || isAws;
         if (labelInput) labelInput.disabled = isSimulated;
-        if (slotInput) slotInput.disabled = isSimulated;
+        if (slotInput) slotInput.disabled = isSimulated || isAws;
+
+        // Label logic changes for AWS (Label -> Key ID)
+        if (isAws) {
+            if (labelInput) {
+                labelInput.placeholder = "Enter KMS Key ID / Alias";
+                labelInput.previousElementSibling.textContent = "KMS Key ID";
+            }
+        } else {
+            if (labelInput) {
+                labelInput.placeholder = "Enter Key Label";
+                labelInput.previousElementSibling.textContent = "KEK Label";
+            }
+        }
+
 
         if (isSimulated) {
             if (errorDiv) errorDiv.classList.add('hidden');

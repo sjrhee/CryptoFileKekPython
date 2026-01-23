@@ -6,7 +6,7 @@ load_dotenv()
 import base64
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from src.services.file_storage_service import FileStorageService
-from src.services.hsm_service import HsmService, SimulatedHsmService, RealHsmService
+from src.services.hsm_service import HsmService, SimulatedHsmService, RealHsmService, AwsKmsService
 from src.services.dek_service import DekService
 from src.services.file_encryption_service import FileEncryptionService
 
@@ -63,8 +63,15 @@ def get_config_defaults():
             'pin': os.getenv('PSE_HSM_PIN', '1111'),
             'slotId': os.getenv('PSE_HSM_SLOT', '1'),
             'label': os.getenv('PSE_HSM_LABEL', 'master_key')
+        },
+        'aws': {
+            'region': os.getenv('AWS_REGION', 'ap-northeast-2'),
+            'keyId': os.getenv('AWS_KMS_KEY_ID', ''),
+            'accessKey': os.getenv('AWS_ACCESS_KEY_ID', ''),
+            'secretKey': os.getenv('AWS_SECRET_ACCESS_KEY', '')
         }
     })
+
 
 
 
@@ -140,6 +147,9 @@ def hsm_config():
         default_pin = os.getenv('PSE_HSM_PIN', '')
         default_label = os.getenv('PSE_HSM_LABEL', 'master_key')
         default_slot = int(os.getenv('PSE_HSM_SLOT', '1'))
+    elif hsm_type == 'AWS':
+        default_label = os.getenv('AWS_KMS_KEY_ID', '') # Use label field for KeyID
+
 
     pin = data.get('pin', default_pin)
     label = data.get('label', default_label)
@@ -169,8 +179,25 @@ def hsm_config():
             hsm_service = new_hsm
             current_hsm_type = 'PSE'
             
+        elif hsm_type == 'AWS':
+            # AWS KMS
+            # User might provide keys in request or we use env vars (priority to env if not provided or empty)
+            # For simplicity, we assume env vars or IAM role if not provided in UI (though UI fields don't exist yet for keys)
+            
+            access_key = os.getenv('AWS_ACCESS_KEY_ID')
+            secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+            region = os.getenv('AWS_REGION', 'ap-northeast-2')
+            
+            # Label field is re-used for KeyID
+            kms_key_id = label 
+            
+            new_hsm = AwsKmsService(key_id=kms_key_id, access_key=access_key, secret_key=secret_key, region=region)
+            hsm_service = new_hsm
+            current_hsm_type = 'AWS'
+
         else:
             # SIMULATED
+
             hsm_service = SimulatedHsmService()
             current_hsm_type = 'SIMULATED'
         

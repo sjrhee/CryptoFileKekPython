@@ -10,6 +10,13 @@ try:
 except ImportError:
     PyKCS11 = None
 
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+except ImportError:
+    boto3 = None
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -160,4 +167,54 @@ class RealHsmService(HsmService):
             return bytes(decrypted_data)
         except Exception as e:
             logger.error(f"HSM Decrypt (Unwrap) failed: {e}")
+
             raise
+
+class AwsKmsService(HsmService):
+    def __init__(self, key_id, access_key=None, secret_key=None, region='ap-northeast-2'):
+        self.key_id = key_id
+        
+        if not boto3:
+            raise ImportError("boto3 is not installed")
+
+        try:
+            if access_key and secret_key:
+                self.client = boto3.client(
+                    'kms',
+                    region_name=region,
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key
+                )
+            else:
+                # Use environment variables or IAM role
+                self.client = boto3.client('kms', region_name=region)
+                
+            logger.info(f"Initialized AWS KMS Service with Key ID: {key_id} in {region}")
+        except Exception as e:
+            logger.error(f"Failed to initialize AWS KMS client: {e}")
+            raise
+
+    def encrypt_with_kek(self, plaintext: bytes) -> bytes:
+        try:
+            # KMS Encrypt
+            response = self.client.encrypt(
+                KeyId=self.key_id,
+                Plaintext=plaintext
+            )
+            return response['CiphertextBlob']
+        except ClientError as e:
+            logger.error(f"AWS KMS Encrypt failed: {e}")
+            raise
+
+    def decrypt_with_kek(self, ciphertext: bytes) -> bytes:
+        try:
+            # KMS Decrypt
+            response = self.client.decrypt(
+                CiphertextBlob=ciphertext,
+                KeyId=self.key_id 
+            )
+            return response['Plaintext']
+        except ClientError as e:
+            logger.error(f"AWS KMS Decrypt failed: {e}")
+            raise
+

@@ -175,6 +175,12 @@ PSE_LIB_PATH=/opt/safenet/protecttoolkit7/ptk/lib/libcryptoki.so
 PSE_HSM_PIN=1111
 PSE_HSM_SLOT=1
 PSE_HSM_LABEL=master_key
+
+# AWS KMS Config
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=ap-northeast-2
+AWS_KMS_KEY_ID=alias/example-key
 ```
 
 ## 암호화 오버헤드 (Encryption Overhead)
