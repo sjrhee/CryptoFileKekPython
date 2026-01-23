@@ -161,6 +161,22 @@ pip install -r requirements.txt
 - **HSM PIN**: 파티션/슬롯 비밀번호 입력.
 - **KEK Label**: 래핑에 사용할 키 객체의 라벨 입력.
 
+### 6. 환경 변수 설정 (.env)
+프로젝트 루트에 `.env` 파일을 생성하여 설정을 관리할 수 있습니다.
+```ini
+# LUNA Config
+LUNA_LIB_PATH=/opt/safenet/lunaclient/lib/libCryptoki2_64.so
+LUNA_HSM_PIN=12341234
+LUNA_HSM_SLOT=1
+LUNA_HSM_LABEL=master_key
+
+# PSE Config
+PSE_LIB_PATH=/opt/safenet/protecttoolkit7/ptk/lib/libcryptoki.so
+PSE_HSM_PIN=1111
+PSE_HSM_SLOT=1
+PSE_HSM_LABEL=master_key
+```
+
 ## 암호화 오버헤드 (Encryption Overhead)
 AES-GCM 알고리즘 특성상 암호화된 파일은 원본보다 정확히 **28바이트** 커집니다.
 - **IV**: 12 bytes
