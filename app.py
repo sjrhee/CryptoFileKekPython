@@ -120,8 +120,11 @@ def hsm_config():
             current_hsm_type = 'LUNA'
             
         elif hsm_type == 'PSE':
-            # PSE (formerly Real HSM) - Auto-detect lib
-            new_hsm = RealHsmService(label=label, slot_id=slot_id)
+            # PSE HSM
+            # User specified path:
+            pse_lib_path = '/opt/safenet/protecttoolkit7/ptk/lib/libcryptoki.so'
+            
+            new_hsm = RealHsmService(lib_path=pse_lib_path, label=label, slot_id=slot_id)
             new_hsm.login(pin)
             hsm_service = new_hsm
             current_hsm_type = 'PSE'

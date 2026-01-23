@@ -75,33 +75,17 @@ class SimulatedHsmService(HsmService):
         return decryptor.update(actual_ciphertext) + decryptor.finalize()
 
 class RealHsmService(HsmService):
-    def __init__(self, lib_path=None, slot_id=0, label='mk'):
+    def __init__(self, lib_path, slot_id=0, label='mk'):
         self.session = None # Initialize first for safety in __del__
         self.label = label
         
         if not PyKCS11:
             raise ImportError("PyKCS11 is not installed")
         
-        # Auto-detect lib path if not provided (common locations)
         if not lib_path:
-            possible_libs = [
-                "/usr/lib/libcryptoki.so",
-                "/usr/lib/pkcs11/libopendcpt.so"
-            ]
-            
-            # Add PTK Library path if env var is set (by setvars.sh)
-            ptk_lib = os.environ.get('PTKLIB')
-            if ptk_lib:
-                # Prioritize libcryptoki.so as per user instruction
-                possible_libs.insert(0, os.path.join(ptk_lib, 'libcryptoki.so'))
+             raise ValueError("HSM Library path must be provided")
 
-            for lib in possible_libs:
-                if os.path.exists(lib):
-                    lib_path = lib
-                    break
-        
-        if not lib_path:
-            raise ValueError(f"HSM Library path could not be determined. Checked: {', '.join(possible_libs)}")
+        self.lib_path = lib_path
 
         self.lib_path = lib_path
         self.slot_id = slot_id
