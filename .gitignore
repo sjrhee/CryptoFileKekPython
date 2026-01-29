@@ -8,6 +8,8 @@ DATA/*
 .idea/
 .vscode/
 *.key
+*.crt
+*.csr
 
 # Local config and logs
 .env

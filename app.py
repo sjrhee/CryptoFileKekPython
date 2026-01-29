@@ -6,7 +6,9 @@ load_dotenv()
 import base64
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from src.services.file_storage_service import FileStorageService
-from src.services.hsm_service import HsmService, SimulatedHsmService, RealHsmService, AwsKmsService
+from src.services.hsm_service import HsmService, SimulatedHsmService, RealHsmService
+from src.services.remote_hsm_service import RemoteHsmService
+
 from src.services.dek_service import DekService
 from src.services.file_encryption_service import FileEncryptionService
 
@@ -64,11 +66,11 @@ def get_config_defaults():
             'slotId': os.getenv('PSE_HSM_SLOT', '1'),
             'label': os.getenv('PSE_HSM_LABEL', 'master_key')
         },
-        'aws': {
-            'region': os.getenv('AWS_REGION', 'ap-northeast-2'),
-            'keyId': os.getenv('AWS_KMS_KEY_ID', ''),
-            'accessKey': os.getenv('AWS_ACCESS_KEY_ID', ''),
-            'secretKey': os.getenv('AWS_SECRET_ACCESS_KEY', '')
+        'remote': {
+            'url': os.getenv('REMOTE_HSM_URL', 'https://localhost:8443'),
+            'clientCert': os.getenv('REMOTE_HSM_CLIENT_CERT', 'ProxyServer/certs/client.crt'),
+            'clientKey': os.getenv('REMOTE_HSM_CLIENT_KEY', 'ProxyServer/certs/client.key'),
+            'caCert': os.getenv('REMOTE_HSM_CA_CERT', 'ProxyServer/certs/ca.crt')
         }
     })
 
@@ -129,7 +131,8 @@ def hsm_config():
     global hsm_service, dek_service, current_hsm_type
     data = request.json
     
-    # New parameter hsmType: 'SIMULATED' | 'PSE' | 'LUNA'
+    # New parameter hsmType: 'SIMULATED' | 'PSE' | 'LUNA' | 'REMOTE'
+
     # Fallback to useHsm for backward compatibility if needed, but we are changing frontend too.
     hsm_type = data.get('hsmType', 'SIMULATED')
     
@@ -147,8 +150,8 @@ def hsm_config():
         default_pin = os.getenv('PSE_HSM_PIN', '')
         default_label = os.getenv('PSE_HSM_LABEL', 'master_key')
         default_slot = int(os.getenv('PSE_HSM_SLOT', '1'))
-    elif hsm_type == 'AWS':
-        default_label = os.getenv('AWS_KMS_KEY_ID', '') # Use label field for KeyID
+    elif hsm_type == 'REMOTE':
+        default_label = 'remote_key'
 
 
     pin = data.get('pin', default_pin)
@@ -179,21 +182,21 @@ def hsm_config():
             hsm_service = new_hsm
             current_hsm_type = 'PSE'
             
-        elif hsm_type == 'AWS':
-            # AWS KMS
-            # User might provide keys in request or we use env vars (priority to env if not provided or empty)
-            # For simplicity, we assume env vars or IAM role if not provided in UI (though UI fields don't exist yet for keys)
+        elif hsm_type == 'REMOTE':
+            # Remote Proxy HSM
+            remote_url = os.getenv('REMOTE_HSM_URL', 'https://localhost:8443')
+            client_cert = os.getenv('REMOTE_HSM_CLIENT_CERT', 'ProxyServer/certs/client.crt')
+            client_key = os.getenv('REMOTE_HSM_CLIENT_KEY', 'ProxyServer/certs/client.key')
+            ca_cert = os.getenv('REMOTE_HSM_CA_CERT', 'ProxyServer/certs/ca.crt')
             
-            access_key = os.getenv('AWS_ACCESS_KEY_ID')
-            secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-            region = os.getenv('AWS_REGION', 'ap-northeast-2')
-            
-            # Label field is re-used for KeyID
-            kms_key_id = label 
-            
-            new_hsm = AwsKmsService(key_id=kms_key_id, access_key=access_key, secret_key=secret_key, region=region)
+            # Verify files exist, if relatively mapped
+            if not os.path.exists(client_cert):
+                 # Try absolute if relative fails or assume user knows what they are doing if absolute
+                 pass
+
+            new_hsm = RemoteHsmService(url=remote_url, client_cert_path=client_cert, client_key_path=client_key, ca_cert_path=ca_cert)
             hsm_service = new_hsm
-            current_hsm_type = 'AWS'
+            current_hsm_type = 'REMOTE'
 
         else:
             # SIMULATED

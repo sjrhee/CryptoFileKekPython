@@ -372,8 +372,7 @@
                     <option value="PSE" style="background-color: #0f0f23; color: white;">PSE HSM</option>
 
                     <option value="LUNA" style="background-color: #0f0f23; color: white;">Luna HSM</option>
-                    <option value="AWS" style="background-color: #0f0f23; color: white;">AWS KMS (Test Incomplete)
-                    </option>
+                    <option value="REMOTE" style="background-color: #0f0f23; color: white;">Remote HSM (Proxy)</option>
                 </select>
 
             </div>
@@ -405,6 +404,45 @@
 
             </div>
 
+            <!-- Remote HSM Config Fields -->
+            <div id="remoteConfigFields" class="hidden">
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="remoteUrl"
+                        style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Remote URL</label>
+                    <input type="text" id="remoteUrl"
+                        style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                        disabled>
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="remoteClientCert"
+                        style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Client Cert
+                        Path</label>
+                    <input type="text" id="remoteClientCert"
+                        style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                        disabled>
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="remoteClientKey"
+                        style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Client Key
+                        Path</label>
+                    <input type="text" id="remoteClientKey"
+                        style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                        disabled>
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <label for="remoteCaCert"
+                        style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">CA Cert
+                        Path</label>
+                    <input type="text" id="remoteCaCert"
+                        style="width: 100%; padding: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); border-radius: 8px; color: white;"
+                        disabled>
+                </div>
+                <div class="alert alert-info"
+                    style="font-size: 0.85rem; background: rgba(63, 81, 181, 0.2); border: 1px solid rgba(63, 81, 181, 0.4); color: #abc;">
+                    ℹ️ Remote HSM configuration is currently read-only (Set via .env).
+                </div>
+            </div>
+
             <div id="settingsError" style="color: #ff6b6b; margin-bottom: 1rem; font-size: 0.9rem;" class="hidden">
             </div>
 
@@ -415,7 +453,7 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=3.4"></script>
+    <script src="/static/js/app.js?v=3.6"></script>
 </body>
 
 </html>

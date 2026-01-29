@@ -190,7 +190,7 @@ const Settings = {
     config: {
         luna: { pin: '', slotId: 1, label: 'master_key' },
         pse: { pin: '', slotId: 1, label: 'master_key' },
-        aws: { accessKey: '', secretKey: '', region: 'ap-northeast-2', keyId: '' }
+        remote: { url: '', clientCert: '', clientKey: '', caCert: '' }
     },
 
 
@@ -270,23 +270,41 @@ const Settings = {
         console.log("Settings: Selected Type =", type);
 
         const isSimulated = (type === 'SIMULATED');
-        const isAws = (type === 'AWS');
+        const isRemote = (type === 'REMOTE');
 
-        if (pinInput) pinInput.disabled = isSimulated || isAws;
-        if (labelInput) labelInput.disabled = isSimulated;
-        if (slotInput) slotInput.disabled = isSimulated || isAws;
+        if (pinInput) pinInput.disabled = isSimulated || isRemote;
+        if (labelInput) labelInput.disabled = isSimulated || isRemote;
+        if (slotInput) slotInput.disabled = isSimulated || isRemote;
 
-        // Label logic changes for AWS (Label -> Key ID)
-        if (isAws) {
-            if (labelInput) {
-                labelInput.placeholder = "Enter KMS Key ID / Alias";
-                labelInput.previousElementSibling.textContent = "KMS Key ID";
+        // Remote Config Logic
+        const remoteFields = document.getElementById('remoteConfigFields');
+        if (remoteFields) {
+            if (isRemote) {
+                remoteFields.classList.remove('hidden');
+                // Hide standard fields that aren't used
+                if (pinInput) pinInput.closest('div').classList.add('hidden');
+                if (labelInput) labelInput.closest('div').classList.add('hidden');
+                if (slotInput) slotInput.closest('div').classList.add('hidden');
+
+                // Populate Remote fields
+                if (this.config.remote) {
+                    document.getElementById('remoteUrl').value = this.config.remote.url || '';
+                    document.getElementById('remoteClientCert').value = this.config.remote.clientCert || '';
+                    document.getElementById('remoteClientKey').value = this.config.remote.clientKey || '';
+                    document.getElementById('remoteCaCert').value = this.config.remote.caCert || '';
+                }
+            } else {
+                remoteFields.classList.add('hidden');
+                // Show standard fields
+                if (pinInput) pinInput.closest('div').classList.remove('hidden');
+                if (labelInput) labelInput.closest('div').classList.remove('hidden');
+                if (slotInput) slotInput.closest('div').classList.remove('hidden');
             }
-        } else {
-            if (labelInput) {
-                labelInput.placeholder = "Enter Key Label";
-                labelInput.previousElementSibling.textContent = "KEK Label";
-            }
+        }
+
+        if (labelInput) {
+            labelInput.placeholder = "Enter Key Label";
+            labelInput.previousElementSibling.textContent = "KEK Label";
         }
 
 
@@ -302,6 +320,8 @@ const Settings = {
             if (pinInput) pinInput.value = this.config.pse.pin;
             if (labelInput) labelInput.value = this.config.pse.label;
             if (slotInput) slotInput.value = this.config.pse.slotId;
+        } else if (type === 'REMOTE') {
+            // Remote specific setup if any needed beyond field visibility
         }
 
 
@@ -353,7 +373,7 @@ const Settings = {
         console.log("Settings: Saving", { hsmType, pinHasValue: !!pin, label, slotId });
 
         // Validation
-        if (hsmType !== 'SIMULATED' && (!pin || pin.trim() === '')) {
+        if (hsmType !== 'SIMULATED' && hsmType !== 'REMOTE' && (!pin || pin.trim() === '')) {
             errorDiv.textContent = "PIN is required when using HSM.";
             errorDiv.classList.remove('hidden');
             console.warn("Settings: Save aborted - PIN required");
