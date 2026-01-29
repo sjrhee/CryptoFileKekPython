@@ -28,6 +28,10 @@
     - **HSM PIN**: HSM 접근을 위한 PIN을 설정할 수 있습니다. (기본값: `1111`)
     - **KEK Label**: 사용할 키의 라벨을 지정할 수 있습니다. (기본값: `master_key`)
 
+### 5. 원격 HSM (Remote HSM via mTLS)
+- **ProxyServer**: 독립적인 서버 애플리케이션으로, 실제 HSM 또는 시뮬레이션을 대행합니다.
+- **mTLS 보안**: 클라이언트(메인 앱)와 ProxyServer 간의 통신은 Mutual TLS로 상호 인증 및 암호화됩니다.
+
 ## 시스템 구조 (System Architecture)
 
 ### 기술 스택 (Tech Stack)
@@ -49,6 +53,12 @@ graph TD
         HSM["HSM Service (Interface)"]
         RealHSM["RealHsmService (PyKCS11)"]
         SimHSM["SimulatedHsmService"]
+        RemoteHSM["RemoteHsmService (REST/mTLS)"]
+    end
+    
+    subgraph "Proxy Server (Sub-Project)"
+        Proxy["Flask Proxy App"]
+        Nginx["Nginx (mTLS Termination)"]
     end
     
     FS["File System (DATA)"]
@@ -63,6 +73,11 @@ graph TD
     DS -->|Key Wrap/Unwrap| HSM
     HSM -->|Simulated| SimHSM
     HSM -->|PKCS#11| RealHSM
+    HSM -->|HTTPS/mTLS| RemoteHSM
+    
+    RemoteHSM -->|Requests| Nginx
+    Nginx -->|Proxy| Proxy
+    
     RealHSM -->|libcryptoki.so| HW_HSM
     FES -->|AES-GCM| FS
 ```
@@ -158,8 +173,32 @@ pip install -r requirements.txt
 웹 인터페이스의 우측 상단 **설정(Settings)** 아이콘을 클릭하여 HSM 모드를 변경할 수 있습니다.
 - **Use Real HSM**: 체크 시 실제 HSM 라이브러리(`libcryptoki.so`)를 로드합니다.
 - **HSM Slot ID**: 사용할 슬롯 번호 입력.
-- **HSM PIN**: 파티션/슬롯 비밀번호 입력.
+- **HSM PIN**: 파티션/슬롯 비밀번호 입력 (Remote 모드 제외).
 - **KEK Label**: 래핑에 사용할 키 객체의 라벨 입력.
+- **Remote HSM**: 선택 시 ProxyServer를 통해 키 작업을 수행합니다. (설정은 `.env`에서 관리)
+
+## ProxyServer 사용 방법 (Remote HSM)
+메인 앱과는 별도로 실행되는 HSM 대행 서버입니다.
+
+### 1. 인증서 생성 및 서버 시작
+```bash
+# 1. 인증서 생성 (CN, IP 지정 가능)
+./ProxyServer/scripts/gen_certs.sh localhost 127.0.0.1
+
+# 2. 서버 시작 (Nginx + Flask)
+./ProxyServer/scripts/start.sh
+
+# 3. 재시작 (설정/인증서 변경 시)
+./ProxyServer/scripts/restart.sh
+```
+
+### 2. 클라이언트 인증서 추가 발급 (Optional)
+```bash
+./ProxyServer/scripts/gen_client_cert.sh NewClientName filename
+```
+
+### 3. 메인 앱 연동 설정
+`.env` 파일에 Remote HSM 정보를 입력합니다.
 
 ### 6. 환경 변수 설정 (.env)
 프로젝트 루트에 `.env` 파일을 생성하여 설정을 관리할 수 있습니다.
@@ -176,11 +215,11 @@ PSE_HSM_PIN=1111
 PSE_HSM_SLOT=1
 PSE_HSM_LABEL=master_key
 
-# AWS KMS Config
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_REGION=ap-northeast-2
-AWS_KMS_KEY_ID=alias/example-key
+# Remote HSM Config
+REMOTE_HSM_URL=https://localhost:8443
+REMOTE_HSM_CLIENT_CERT=/path/to/client.crt
+REMOTE_HSM_CLIENT_KEY=/path/to/client.key
+REMOTE_HSM_CA_CERT=/path/to/ca.crt
 ```
 
 ## 암호화 오버헤드 (Encryption Overhead)
