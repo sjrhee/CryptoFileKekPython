@@ -194,7 +194,8 @@ pip install -r requirements.txt
 
 ### 2. 클라이언트 인증서 추가 발급 (Optional)
 ```bash
-./ProxyServer/scripts/gen_client_cert.sh NewClientName filename
+./ProxyServer/scripts/gen_client_cert.sh NewClientName filename [OptionalIP]
+# 예: ./ProxyServer/scripts/gen_client_cert.sh "NewClient" "new_client" 192.168.0.211
 ```
 
 ### 3. 메인 앱 연동 설정
